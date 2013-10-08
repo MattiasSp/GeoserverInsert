@@ -38,7 +38,7 @@ import javax.swing.border.Border;
  * and a JTextArea for entering layer attributes into the field.
  *
  * @author Mattias Sp&aring;ngmyr
- * @version 0.3, 2013-10-08
+ * @version 0.4, 2013-10-08
  */
 public class FieldPanel extends JPanel {
 	JTextArea mTextArea = new JTextArea();

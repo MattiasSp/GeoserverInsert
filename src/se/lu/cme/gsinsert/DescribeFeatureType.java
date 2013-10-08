@@ -50,7 +50,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * forwarded to a method translating the info into UI components. 
  * 
  * @author Mattias Sp&aring;ngmyr
- * @version 0.3, 2013-10-08
+ * @version 0.4, 2013-10-08
  */
 public class DescribeFeatureType implements Runnable {
 	private GSInsert mUi;

@@ -35,7 +35,7 @@ import java.util.HashMap;
  * Class for loading and storing configuration data from a text file.
  * 
  * @author Mattias Sp&aring;ngmyr
- * @version 0.3, 2013-10-08
+ * @version 0.4, 2013-10-08
  */
 public class Config {
 	public static final String KEY_EDITION = "EDITION";
@@ -67,25 +67,27 @@ public class Config {
 		String line = reader.readLine();
 		
 		while (line != null) {
-			String[] keyValuePair = line.split(" ", 2);
-			if(keyValuePair[0].equalsIgnoreCase(KEY_EDITION))
-				mEdition = keyValuePair[1];
-			else if(keyValuePair[0].equalsIgnoreCase(KEY_USER))
-				mUser = keyValuePair[1];
-			else if(keyValuePair[0].equalsIgnoreCase(KEY_SERVER))
-				mServer = keyValuePair[1];
-			else if(keyValuePair[0].equalsIgnoreCase(KEY_LAYER))
-				mLayer = keyValuePair[1];
-			else if(keyValuePair[0].equalsIgnoreCase(KEY_FIELD)) {
-				String[] fieldPreset = line.split(" ", 3);
-				mFields.put(fieldPreset[1], fieldPreset[2]);
-			}
-			else if(keyValuePair[0].equalsIgnoreCase(KEY_REPLACE)) {
-				String[] fieldPreset = line.split(" ", 3);
-				mReplace.add(new String[] {fieldPreset[1], fieldPreset[2]});
-			}
-			else
-				System.out.println("Invalid line in config.ini.");
+			try {
+				String[] keyValuePair = line.split(" ", 2);
+				if(keyValuePair[0].equalsIgnoreCase(KEY_EDITION))
+					mEdition = keyValuePair[1];
+				else if(keyValuePair[0].equalsIgnoreCase(KEY_USER))
+					mUser = keyValuePair[1];
+				else if(keyValuePair[0].equalsIgnoreCase(KEY_SERVER))
+					mServer = keyValuePair[1];
+				else if(keyValuePair[0].equalsIgnoreCase(KEY_LAYER))
+					mLayer = keyValuePair[1];
+				else if(keyValuePair[0].equalsIgnoreCase(KEY_FIELD)) {
+					String[] fieldPreset = line.split(" ", 3);
+					mFields.put(fieldPreset[1], fieldPreset[2]);
+				}
+				else if(keyValuePair[0].equalsIgnoreCase(KEY_REPLACE)) {
+					String[] fieldPreset = line.split(" ", 3);
+					mReplace.add(new String[] {fieldPreset[1], fieldPreset[2]});
+				}
+				else
+					System.out.println("Invalid line in config.ini.");
+			} catch (ArrayIndexOutOfBoundsException e) { System.out.println("Invalid line in config.ini."); }
 				
 			line = reader.readLine();
 		}

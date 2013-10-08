@@ -54,7 +54,7 @@ import javax.swing.text.JTextComponent;
  * to Geoserver layers.
  *
  * @author Mattias Sp&aring;ngmyr
- * @version 0.3, 2013-10-08
+ * @version 0.4, 2013-10-08
  */
 public class GSInsert {
 	public static final String TITLE = "GeoserverInsert";
@@ -76,7 +76,9 @@ public class GSInsert {
 	protected static final Dimension DIMENSION_MAXBUTTON = new Dimension(162, 25);
 	protected static final Dimension DIMENSION_PREFAREA = new Dimension(162, 50);
 	protected static final Border BORDER = BorderFactory.createEmptyBorder(5, 5, 5, 5);
-	
+
+	protected static final String RESPONSE_UNAUTHORIZED_TITLE = "Unauthorized";
+	protected static final String RESPONSE_UNAUTHORIZED_MESSAGE = "Auhorization credentials are missing or invalid.\nEnter or correct Your user name and password.\n(Leave blank if they are not required.)";
 	protected static final String URL_WARNING_TITLE = "Invalid URL";
 	protected static final String URL_WARNING_MESSAGE = "Check that your Geoserver URL is correct.";
 	protected static final String CON_ERROR_TITLE = "Connection Failed";
@@ -291,7 +293,7 @@ public class GSInsert {
 	 * @param layers The list of layers to publish.
 	 */
 	public void publishLayers(ArrayList<String> layers) {
-		int matchedIndex = 0;
+		int matchedIndex = -1;
 		/* Find out the index of any layer that's been preset in the config file. */
 		if(!mConfig.getLayer().equalsIgnoreCase("")) {
 			for(int i=0; i < layers.size(); i++) {
@@ -300,7 +302,8 @@ public class GSInsert {
 			}
 		}
 		mLayersComboBox.setModel(new DefaultComboBoxModel<String>(layers.toArray(new String[layers.size()])));
-		mLayersComboBox.setSelectedIndex(matchedIndex);
+		if(matchedIndex != -1)
+			mLayersComboBox.setSelectedIndex(matchedIndex);
 		mFieldsPanel.removeAll();
 		mFrame.pack();
 	}
@@ -311,7 +314,11 @@ public class GSInsert {
 	 * @param fields The fields to publish.
 	 */
 	public void publishFields(ArrayList<LayerField> fields) {
-		mFieldsPanel.removeAll(); // Clear all LayerField panels to make room for the new ones.		
+		/* Clear all LayerField panels, TextField references and Field Types to make room for the new ones. */
+		mFieldsPanel.removeAll(); 
+		mTextFields.clear();
+		mFieldTypes.clear();
+
 		for(LayerField field : fields) {
 			FieldPanel panel = new FieldPanel(field.getName(), field.getType(), field.getNullable(), mConfig.getFields().get(field.getName()));
 			mTextFields.put(field.getName(), panel.getTextArea()); // Store a reference to the JTextField displaying that specific field. 
@@ -350,8 +357,8 @@ public class GSInsert {
 						rep.get(i)[0] = rep.get(i)[0].replace(key, ESCAPESEQUENCES.get(key));
 					text = text.replace(rep.get(i)[0], rep.get(i)[1]);
 				}
-			}
-			text = "<![CDATA[" + text + "]]>";
+				text = "<![CDATA[" + text + "]]>";
+			}			
 			map.put(field, text);
 		}
 		return map;

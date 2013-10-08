@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.Set;
 
 import javax.swing.JOptionPane;
+import javax.xml.bind.DatatypeConverter;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
@@ -50,10 +51,11 @@ import org.xml.sax.helpers.DefaultHandler;
  * instance and parsing the response XML to announce the result.
  * 
  * @author Mattias Sp&aring;ngmyr
- * @version 0.3, 2013-10-087
+ * @version 0.4, 2013-10-08
  */
 public class WfsInsert implements Runnable {
 	private static final String NAMESPACE = "ns";
+	public static final int RESPONSE_UNAUTHORIZED = 401;
 	private GSInsert mUi;
 	private String mUrl;
 	private String mUser;
@@ -115,19 +117,10 @@ public class WfsInsert implements Runnable {
 	 */
 	private BufferedReader makeRequest() {
 		URL request;
-		String authtext = "";
-		if(!mUser.equalsIgnoreCase("") && !mPass.equalsIgnoreCase("")) // If the user provided both username and password, include them.
-			authtext = mUser + ":" + mPass + "@";
-		
-		URL url;
+
 		try { // Check that the URL is ok and form the request URL.
-			url = new URL(mUrl);
-			System.out.println(url.getProtocol() + "://" + authtext +
-					mUrl.substring(url.getProtocol().length() + 3) +
-					"/wfs");
-			request = new URL(url.getProtocol() + "://" + authtext +
-					mUrl.substring(url.getProtocol().length() + 3) +
-					"/wfs");
+			System.out.println(mUrl + "/wfs");
+			request = new URL(mUrl + "/wfs");
 		} catch (MalformedURLException e) {
 			mUi.displayAlert(GSInsert.URL_WARNING_TITLE, GSInsert.URL_WARNING_MESSAGE, JOptionPane.WARNING_MESSAGE);
 			return null;
@@ -138,21 +131,29 @@ public class WfsInsert implements Runnable {
 		
 		/* Perform the request. */
 		HttpURLConnection con;
+		int responseCode = 0;
 		try {
 			con = (HttpURLConnection) request.openConnection();
 			con.setDoOutput(true);
 			con.setRequestProperty("content-type", "text/xml");
+			if(!mUser.equalsIgnoreCase("") || !mPass.equalsIgnoreCase(""))
+				con.setRequestProperty("Authorization", "Basic " + DatatypeConverter.printBase64Binary(new String(mUser + ":" + mPass).getBytes("UTF-8")));
 			DataOutputStream stream = new DataOutputStream(con.getOutputStream());
 			stream.write(insertXml.getBytes("UTF-8"));
 			stream.flush();
 			stream.close();
+
+			responseCode = con.getResponseCode();
 
 			BufferedReader response = new BufferedReader(
 			        new InputStreamReader(con.getInputStream()));
 			return response;
 		} catch (IOException e) {
 			e.printStackTrace();
-			mUi.displayAlert(GSInsert.CON_ERROR_TITLE, GSInsert.CON_ERROR_MESSAGE, JOptionPane.WARNING_MESSAGE);
+			if(responseCode == RESPONSE_UNAUTHORIZED)
+				mUi.displayAlert(GSInsert.RESPONSE_UNAUTHORIZED_TITLE, GSInsert.RESPONSE_UNAUTHORIZED_MESSAGE, JOptionPane.WARNING_MESSAGE);
+			else
+				mUi.displayAlert(GSInsert.CON_ERROR_TITLE, GSInsert.CON_ERROR_MESSAGE, JOptionPane.WARNING_MESSAGE);
 			return null;
 		}		
 	}

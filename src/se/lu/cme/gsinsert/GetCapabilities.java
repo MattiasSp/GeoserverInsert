@@ -48,7 +48,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * request to it and sends the reply to an XML parser.
  *
  * @author Mattias Sp&aring;ngmyr
- * @version 0.3, 2013-10-08
+ * @version 0.4, 2013-10-08
  */
 public class GetCapabilities implements Runnable {
 	private GSInsert mUi;
