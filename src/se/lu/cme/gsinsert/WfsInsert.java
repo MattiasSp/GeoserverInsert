@@ -50,7 +50,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * instance and parsing the response XML to announce the result.
  * 
  * @author Mattias Sp&aring;ngmyr
- * @version 0.2, 2013-10-07
+ * @version 0.3, 2013-10-087
  */
 public class WfsInsert implements Runnable {
 	private static final String NAMESPACE = "ns";
@@ -129,7 +129,7 @@ public class WfsInsert implements Runnable {
 					mUrl.substring(url.getProtocol().length() + 3) +
 					"/wfs");
 		} catch (MalformedURLException e) {
-			mUi.displayAlert(GSInsert.URL_WARNING_MESSAGE, GSInsert.URL_WARNING_TITLE, JOptionPane.WARNING_MESSAGE);
+			mUi.displayAlert(GSInsert.URL_WARNING_TITLE, GSInsert.URL_WARNING_MESSAGE, JOptionPane.WARNING_MESSAGE);
 			return null;
 		}
 		
@@ -152,7 +152,7 @@ public class WfsInsert implements Runnable {
 			return response;
 		} catch (IOException e) {
 			e.printStackTrace();
-			mUi.displayAlert(GSInsert.CON_ERROR_MESSAGE, GSInsert.CON_ERROR_TITLE, JOptionPane.WARNING_MESSAGE);
+			mUi.displayAlert(GSInsert.CON_ERROR_TITLE, GSInsert.CON_ERROR_MESSAGE, JOptionPane.WARNING_MESSAGE);
 			return null;
 		}		
 	}

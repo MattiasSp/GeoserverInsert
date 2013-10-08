@@ -50,7 +50,7 @@ import org.xml.sax.helpers.DefaultHandler;
  * forwarded to a method translating the info into UI components. 
  * 
  * @author Mattias Sp&aring;ngmyr
- * @version 0.2, 2013-10-07
+ * @version 0.3, 2013-10-08
  */
 public class DescribeFeatureType implements Runnable {
 	private GSInsert mUi;
@@ -120,7 +120,7 @@ public class DescribeFeatureType implements Runnable {
 					"/wfs?service=wfs&version=1.1.0&request=DescribeFeatureType&typeName=" +
 					mLayer);
 		} catch (MalformedURLException e) {
-			mUi.displayAlert(GSInsert.URL_WARNING_MESSAGE, GSInsert.URL_WARNING_TITLE, JOptionPane.WARNING_MESSAGE);
+			mUi.displayAlert(GSInsert.URL_WARNING_TITLE, GSInsert.URL_WARNING_MESSAGE, JOptionPane.WARNING_MESSAGE);
 			return null;
 		}
 		
@@ -133,7 +133,7 @@ public class DescribeFeatureType implements Runnable {
 			return response;
 		} catch (IOException e) {
 			e.printStackTrace();
-			mUi.displayAlert(GSInsert.CON_ERROR_MESSAGE, GSInsert.CON_ERROR_TITLE, JOptionPane.WARNING_MESSAGE);
+			mUi.displayAlert(GSInsert.CON_ERROR_TITLE, GSInsert.CON_ERROR_MESSAGE, JOptionPane.WARNING_MESSAGE);
 			return null;
 		}		
 	}

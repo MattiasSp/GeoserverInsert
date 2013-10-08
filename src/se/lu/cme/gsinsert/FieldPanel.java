@@ -38,7 +38,7 @@ import javax.swing.border.Border;
  * and a JTextArea for entering layer attributes into the field.
  *
  * @author Mattias Sp&aring;ngmyr
- * @version 0.2, 2013-10-07
+ * @version 0.3, 2013-10-08
  */
 public class FieldPanel extends JPanel {
 	JTextArea mTextArea = new JTextArea();
@@ -47,8 +47,9 @@ public class FieldPanel extends JPanel {
 	 * @param label The text to display next to the JTextArea.
 	 * @param type The type of field, determining what input types are valid and setting the JTextArea hint.
 	 * @param nullable Whether or not the field is allowed to be empty.
+	 * @param preset Text to display in the field.
 	 */
-	public FieldPanel(String label, String type, boolean nullable) {
+	public FieldPanel(String label, String type, boolean nullable, String preset) {
 		/* Set panel properties. */
 		setLayout(new BorderLayout(5,0));
 		setBorder(GSInsert.BORDER);
@@ -67,6 +68,7 @@ public class FieldPanel extends JPanel {
 		if(type.split(":", 2)[0].equalsIgnoreCase("gml")) // If the type is geometry, give "[lon] [lat]" hint.		
 			mTextArea.setText(GSInsert.HINT_GEOMETRY);
 		mTextArea.setToolTipText(type);
+		mTextArea.setText(preset);
 
 		/* Add the components to the panel. */
 		add(jlabel, BorderLayout.WEST);

@@ -4,8 +4,11 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -51,12 +54,11 @@ import javax.swing.text.JTextComponent;
  * to Geoserver layers.
  *
  * @author Mattias Sp&aring;ngmyr
- * @version 0.2, 2013-10-07
+ * @version 0.3, 2013-10-08
  */
 public class GSInsert {
 	public static final String TITLE = "GeoserverInsert";
-	public static final String VERSION = "v0.2";
-	public static final String EDITION = "";
+	public static final String VERSION = "v0.3";
 	protected static final String HEADING_USER = "Username:";
 	protected static final String HEADING_PASS = "Password:";
 	protected static final String TOOLTIP_SERVER = "e.g. http://www.my.server/geoserver";
@@ -85,7 +87,9 @@ public class GSInsert {
 	protected static final String INSERT_SUCCESS_MESSAGE = "The feature was uploaded successfully.";
 	protected static final String INSERT_FAILURE_TITLE = "Upload Failure";
 	protected static final String INSERT_FAILURE_MESSAGE = "The feature was not uploaded correctly. Contact the server administrator.";
-	
+	public static final Map<String, String> ESCAPESEQUENCES = getEscapeSequences();
+
+	private static Config mConfig;
 	private JFrame mFrame = new JFrame();
 	
 	private JPanel mUserPanel = new JPanel();
@@ -125,7 +129,31 @@ public class GSInsert {
 	 * @param args
 	 */
 	public static void main(String[] args) {
+		try {
+			mConfig = new Config();
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.out.println("Unable to read configuration file.");
+		}
 		new GSInsert().createUI();
+	}
+
+	/**
+	 * Produces an immutable map of Java escape sequences
+	 * with their String representations as keys.
+	 * @return A map of escape sequences.
+	 */
+	public static Map<String, String> getEscapeSequences() {
+		HashMap<String, String> escapeSeq = new HashMap<String, String>();
+		escapeSeq.put("\\t", "\t");
+		escapeSeq.put("\\b", "\b");
+		escapeSeq.put("\\n", "\n");
+		escapeSeq.put("\\r", "\r");
+		escapeSeq.put("\\f", "\f");
+		escapeSeq.put("\\\'", "\'");
+		escapeSeq.put("\\\"", "\"");
+		escapeSeq.put("\\\\", "\\");
+		return Collections.unmodifiableMap(escapeSeq);
 	}
 
 	/**
@@ -135,7 +163,7 @@ public class GSInsert {
 		final GSInsert _this = this; // Used for giving other classes a reference to this GSInsert object.
 
 		/* Setup the main window frame. */
-		mFrame.setTitle(TITLE + " " + VERSION + " " + EDITION);
+		mFrame.setTitle(TITLE + " " + VERSION + ((mConfig.getEdition().equalsIgnoreCase("")) ? "" : " - " + mConfig.getEdition()));
 		mFrame.setMinimumSize(DIMENSION_MINFRAME);
 		mFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		mFrame.setLocationByPlatform(true);
@@ -147,7 +175,9 @@ public class GSInsert {
 		mSubUserPanel = new JPanel();
 		mSubUserPanel.setMaximumSize(DIMENSION_AUTHPANEL);
 		mUserLabel.setPreferredSize(DIMENSION_PREFLABEL);
-		mUserTextField.setPreferredSize(DIMENSION_MAXAUTHFIELD);		
+		mUserTextField.setPreferredSize(DIMENSION_MAXAUTHFIELD);
+		if(!mConfig.getUser().equalsIgnoreCase(""))
+			mUserTextField.setText(mConfig.getUser());
 		mSubUserPanel.add(mUserLabel);
 		mSubUserPanel.add(mUserTextField);
 		mUserPanel.add(mSubUserPanel, BorderLayout.WEST);
@@ -171,6 +201,8 @@ public class GSInsert {
 		mServerTextField.setMaximumSize(DIMENSION_MAXFIELD);
 		mServerTextField.setPreferredSize(DIMENSION_MAXAUTHFIELD);
 		mServerTextField.setToolTipText(TOOLTIP_SERVER);
+		if(!mConfig.getServer().equalsIgnoreCase(""))
+			mServerTextField.setText(mConfig.getServer());
 		mServerButton.setPreferredSize(DIMENSION_MAXBUTTON);
 		mServerButton.addActionListener(new ActionListener() {
 			@Override
@@ -259,7 +291,16 @@ public class GSInsert {
 	 * @param layers The list of layers to publish.
 	 */
 	public void publishLayers(ArrayList<String> layers) {
+		int matchedIndex = 0;
+		/* Find out the index of any layer that's been preset in the config file. */
+		if(!mConfig.getLayer().equalsIgnoreCase("")) {
+			for(int i=0; i < layers.size(); i++) {
+				if(mConfig.getLayer().equalsIgnoreCase(layers.get(i)))
+					matchedIndex = i;
+			}
+		}
 		mLayersComboBox.setModel(new DefaultComboBoxModel<String>(layers.toArray(new String[layers.size()])));
+		mLayersComboBox.setSelectedIndex(matchedIndex);
 		mFieldsPanel.removeAll();
 		mFrame.pack();
 	}
@@ -272,7 +313,7 @@ public class GSInsert {
 	public void publishFields(ArrayList<LayerField> fields) {
 		mFieldsPanel.removeAll(); // Clear all LayerField panels to make room for the new ones.		
 		for(LayerField field : fields) {
-			FieldPanel panel = new FieldPanel(field.getName(), field.getType(), field.getNullable());
+			FieldPanel panel = new FieldPanel(field.getName(), field.getType(), field.getNullable(), mConfig.getFields().get(field.getName()));
 			mTextFields.put(field.getName(), panel.getTextArea()); // Store a reference to the JTextField displaying that specific field. 
 			mFieldsPanel.add(panel);
 			mFieldTypes.put(field.getName(), field.getType()); // Store the field types.
@@ -300,8 +341,16 @@ public class GSInsert {
 		// TODO Check if inputs are valid, otherwise alert the user. "if(fail) return null;"
 		for(String field : mTextFields.keySet()) {
 			String text = mTextFields.get(field).getText();
-			if(!mFieldTypes.get(field).split(":", 2)[0].equalsIgnoreCase("gml"))
-				text = text.replace("\n", "<BR>");
+			if(!mFieldTypes.get(field).split(":", 2)[0].equalsIgnoreCase("gml")) {
+				/* Replace given text with specified replacement text. */
+				ArrayList<String[]> rep = mConfig.getReplace();
+				for(int i=0; i < rep.size(); i++) {
+					/* Make String representations of escape sequences into actual escape sequences. */
+					for(String key : ESCAPESEQUENCES.keySet())
+						rep.get(i)[0] = rep.get(i)[0].replace(key, ESCAPESEQUENCES.get(key));
+					text = text.replace(rep.get(i)[0], rep.get(i)[1]);
+				}
+			}
 			text = "<![CDATA[" + text + "]]>";
 			map.put(field, text);
 		}
