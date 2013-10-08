@@ -7,8 +7,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Set;
 
 import javax.swing.JOptionPane;
 import javax.xml.bind.DatatypeConverter;
@@ -56,6 +56,9 @@ import org.xml.sax.helpers.DefaultHandler;
 public class WfsInsert implements Runnable {
 	private static final String NAMESPACE = "ns";
 	public static final int RESPONSE_UNAUTHORIZED = 401;
+	public static final int REPLY_SUCCESS = 0;
+	public static final int REPLY_READ_ONLY = 1;
+	public static final String IS_READ_ONLY = " is read-only";
 	private GSInsert mUi;
 	private String mUrl;
 	private String mUser;
@@ -63,9 +66,9 @@ public class WfsInsert implements Runnable {
 	private String mLayer;
 	private String mNamespace;
 	private HashMap<String, String> mAttributes;
-	/** A list of all the fields' field types, by their name. */
-	private HashMap<String, String> mFieldTypes = new HashMap<String, String>();
-	private boolean mSuccess = false;
+	/** A list of all the fields' field types. */
+	private ArrayList<LayerField> mFields = new ArrayList<LayerField>();
+	private int mReply = -1;
 
 	/**
 	 * Basic constructor for creating this WfsInsert object.
@@ -75,9 +78,9 @@ public class WfsInsert implements Runnable {
 	 * @param pass The password in case authentication is required.
 	 * @param layer The layer name of the layer to update.
 	 * @param attributes The attributes to give the new feature.
-	 * @param fieldtypes The field types of the layer's fields.
+	 * @param fields The field information of the layer.
 	 */
-	public WfsInsert(GSInsert ui, String url, String user, String pass, String layer, String namespace, HashMap<String, String> attributes, HashMap<String, String> fieldtypes) {
+	public WfsInsert(GSInsert ui, String url, String user, String pass, String layer, String namespace, HashMap<String, String> attributes, ArrayList<LayerField> fields) {
 		mUi = ui;
 		mUrl = url;
 		mUser = user;
@@ -85,7 +88,7 @@ public class WfsInsert implements Runnable {
 		mLayer = layer;
 		mNamespace = namespace;
 		mAttributes = attributes;
-		mFieldTypes = fieldtypes;
+		mFields = fields;
 	}
 
 	@Override
@@ -97,9 +100,13 @@ public class WfsInsert implements Runnable {
 		/* Send the request to be interpreted and alert the user
 		 * about the response. */
 		if(parseXml(reply)) {
-			if(mSuccess) {
+			if(mReply == REPLY_SUCCESS) {
 				mUi.displayAlert(GSInsert.INSERT_SUCCESS_TITLE, GSInsert.INSERT_SUCCESS_MESSAGE, JOptionPane.INFORMATION_MESSAGE);
 				System.out.println("Upload success.");
+			}
+			else if(mReply == REPLY_READ_ONLY) {
+				mUi.displayAlert(GSInsert.RESPONSE_UNAUTHORIZED_TITLE, GSInsert.RESPONSE_UNAUTHORIZED_MESSAGE, JOptionPane.WARNING_MESSAGE);
+				System.out.println("Upload unauthorized.");
 			}
 			else {
 				mUi.displayAlert(GSInsert.INSERT_FAILURE_TITLE, GSInsert.INSERT_FAILURE_MESSAGE, JOptionPane.ERROR_MESSAGE);
@@ -199,52 +206,52 @@ public class WfsInsert implements Runnable {
 		String SRS = "srsName=\"http://www.opengis.net/gml/srs/epsg.xml#4326\"";
 
 		/* Go through and add all fields. */
-		Set<String> keyset = mAttributes.keySet();// Fetch the set of keys pertaining to the layer attributes.
-		for(String field : keyset) {
+		for(LayerField field : mFields) {
+			if(!mAttributes.get(field.getName()).equalsIgnoreCase("")) { // Only add fields that have content.
+				/* Get the un-prefixed field name. */
+				String[] fieldparts = field.getName().split(":");
+				String fieldname = fieldparts[fieldparts.length - 1];
 			
-			/* Get the un-prefixed field name. */
-			String[] fieldparts = field.split(":");
-			String fieldname = fieldparts[fieldparts.length - 1];
+				fieldStart = " <" + NAMESPACE + ":" + fieldname + ">";
+				fieldEnd = "</" + NAMESPACE + ":" + fieldname + ">";
+
+				/* Form the element starters and enders required by the corresponding geometry type before the coordinates. */
+				if(field.getType().equalsIgnoreCase("gml:PointPropertyType")) {
+					fieldStart = fieldStart + " <gml:Point " + SRS + ">";
+					attributes = formCoordinates(fieldname);
+					fieldEnd = " </gml:Point>" + fieldEnd;
+				}
+				else if(field.getType().equalsIgnoreCase("gml:MultiPointPropertyType")) {
+					fieldStart = fieldStart + " <gml:MultiPoint " + SRS + ">" + " <gml:pointMember>" + " <gml:Point>";
+					attributes = formCoordinates(fieldname);
+					fieldEnd = " </gml:Point>" + " </gml:pointMember>" + " </gml:MultiPoint>" + fieldEnd;
+				}
+				else if(field.getType().equalsIgnoreCase("gml:LineStringPropertyType")) {
+					fieldStart = fieldStart + " <gml:LineString " + SRS + ">";
+					attributes = formCoordinates(fieldname);
+					fieldEnd = " </gml:LineString>" + fieldEnd;
+				}
+				else if(field.getType().equalsIgnoreCase("gml:MultiLineStringPropertyType")) {
+					fieldStart = fieldStart + " <gml:MultiLineString " + SRS + ">" + " <gml:lineStringMember>" + " <gml:LineString>";
+					attributes = formCoordinates(fieldname);
+					fieldEnd = " </gml:LineString>" + " </gml:lineStringMember>" + " </gml:MultiLineString>" + fieldEnd;
+				}
+				else if(field.getType().equalsIgnoreCase("gml:PolygonPropertyType") || field.getType().equalsIgnoreCase("gml:SurfacePropertyType")) {
+					fieldStart = fieldStart + " <gml:Polygon " + SRS + ">" + " <gml:outerBoundaryIs>" + " <gml:LinearRing>";
+					attributes = formCoordinates(fieldname);
+					fieldEnd = " </gml:LinearRing>" + " </gml:outerBoundaryIs>" + " </gml:Polygon>" + fieldEnd;
+				}
+				else if(field.getType().equalsIgnoreCase("gml:MultiPolygonPropertyType") || field.getType().equalsIgnoreCase("gml:MultiSurfacePropertyType")) {
+					fieldStart = fieldStart + " <gml:MultiPolygon " + SRS + ">" + " <gml:polygonMember>" + " <gml:Polygon>" + " <gml:outerBoundaryIs>" + " <gml:LinearRing>";
+					attributes = formCoordinates(fieldname);
+					fieldEnd = " </gml:LinearRing>" + " </gml:outerBoundaryIs>" + " </gml:Polygon>" + " </gml:polygonMember>" + " </gml:MultiPolygon>" + fieldEnd;
+				}
+				else { // If it's not a geometry field, just add the user input (with XML character data tags around).
+					attributes = "<![CDATA[" + mAttributes.get(field.getName()) + "]]>";
+				}
 			
-			fieldStart = " <" + NAMESPACE + ":" + fieldname + ">";
-			fieldEnd = "</" + NAMESPACE + ":" + fieldname + ">";
-			
-			/* Form the element starters and enders required by the corresponding geometry type before the coordinates. */
-			if(mFieldTypes.get(field).equalsIgnoreCase("gml:PointPropertyType")) {
-				fieldStart = fieldStart + " <gml:Point " + SRS + ">";
-				attributes = formCoordinates(fieldname);
-				fieldEnd = " </gml:Point>" + fieldEnd;
+				insert = insert + fieldStart + attributes + fieldEnd; // Add all the parts of the current field to the resulting Insert String.
 			}
-			else if(mFieldTypes.get(field).equalsIgnoreCase("gml:MultiPointPropertyType")) {
-				fieldStart = fieldStart + " <gml:MultiPoint " + SRS + ">" + " <gml:pointMember>" + " <gml:Point>";
-				attributes = formCoordinates(fieldname);
-				fieldEnd = " </gml:Point>" + " </gml:pointMember>" + " </gml:MultiPoint>" + fieldEnd;
-			}
-			else if(mFieldTypes.get(field).equalsIgnoreCase("gml:LineStringPropertyType")) {
-				fieldStart = fieldStart + " <gml:LineString " + SRS + ">";
-				attributes = formCoordinates(fieldname);
-				fieldEnd = " </gml:LineString>" + fieldEnd;
-			}
-			else if(mFieldTypes.get(field).equalsIgnoreCase("gml:MultiLineStringPropertyType")) {
-				fieldStart = fieldStart + " <gml:MultiLineString " + SRS + ">" + " <gml:lineStringMember>" + " <gml:LineString>";
-				attributes = formCoordinates(fieldname);
-				fieldEnd = " </gml:LineString>" + " </gml:lineStringMember>" + " </gml:MultiLineString>" + fieldEnd;
-			}
-			else if(mFieldTypes.get(field).equalsIgnoreCase("gml:PolygonPropertyType") || mFieldTypes.get(field).equalsIgnoreCase("gml:SurfacePropertyType")) {
-				fieldStart = fieldStart + " <gml:Polygon " + SRS + ">" + " <gml:outerBoundaryIs>" + " <gml:LinearRing>";
-				attributes = formCoordinates(fieldname);
-				fieldEnd = " </gml:LinearRing>" + " </gml:outerBoundaryIs>" + " </gml:Polygon>" + fieldEnd;
-			}
-			else if(mFieldTypes.get(field).equalsIgnoreCase("gml:MultiPolygonPropertyType") || mFieldTypes.get(field).equalsIgnoreCase("gml:MultiSurfacePropertyType")) {
-				fieldStart = fieldStart + " <gml:MultiPolygon " + SRS + ">" + " <gml:polygonMember>" + " <gml:Polygon>" + " <gml:outerBoundaryIs>" + " <gml:LinearRing>";
-				attributes = formCoordinates(fieldname);
-				fieldEnd = " </gml:LinearRing>" + " </gml:outerBoundaryIs>" + " </gml:Polygon>" + " </gml:polygonMember>" + " </gml:MultiPolygon>" + fieldEnd;
-			}
-			else { // If it's not a geometry field, just add the user input.
-				attributes = mAttributes.get(field);
-			}
-			
-			insert = insert + fieldStart + attributes + fieldEnd; // Add all the parts of the current field to the resulting Insert String.
 		}		
 		insert = insert + wfsEnd; // Add the end tags to the Insert element.
 
@@ -309,14 +316,17 @@ public class WfsInsert implements Runnable {
 				Attributes attributes) throws SAXException {
 			System.out.print("<" + qName + ">");
 			if(qName.equalsIgnoreCase(ELEMENT_SUCCESS))
-				mSuccess = true;
+				mReply = REPLY_SUCCESS;
 			super.startElement(uri, localName, qName, attributes);
 		}
 
 		@Override
 		public void characters(char[] ch, int start, int length)
 				throws SAXException {
-			System.out.print(new String(ch, start, length) + "\n");
+			String value = new String(ch, start, length);
+			if(value.contains(mLayer.split(":",2)[1] + IS_READ_ONLY))
+				mReply = REPLY_READ_ONLY;
+			System.out.print(value + "\n");
 			super.characters(ch, start, length);
 		}
 		

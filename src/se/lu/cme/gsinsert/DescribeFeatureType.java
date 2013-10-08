@@ -90,8 +90,8 @@ public class DescribeFeatureType implements Runnable {
 		if(parseXml(reply)) {
 			mUi.publishFields(mFields);
 			mUi.setNamespace(mLayerNamespace);
-			for(int i=0; i < mFields.size(); i++) {
-				System.out.println(mFields.get(i).getName() + " " + mFields.get(i).getType() + ((mFields.get(i).getNullable()) ? "" : " NOT NULL"));
+			for(LayerField field : mFields) {
+				System.out.println(field.getName() + " " + field.getType() + ((field.getNullable()) ? "" : " NOT NULL"));
 			}
 		}
 		else
@@ -184,7 +184,10 @@ public class DescribeFeatureType implements Runnable {
 			else if(qName.equalsIgnoreCase(ELEMENT_SEQUENCE))
 				mWithinSequence = true;
 			else if(qName.equalsIgnoreCase(ELEMENT_ELEMENT) && mWithinSequence) {
-				mFields.add(new LayerField(attributes.getValue("name"), Boolean.parseBoolean(attributes.getValue("nillable")), attributes.getValue("type")));
+				if(attributes.getValue("type").split(":", 2)[0].equalsIgnoreCase("gml")) // Geometry fields must not be null.
+					mFields.add(new LayerField(attributes.getValue("name"), false, attributes.getValue("type")));
+				else
+					mFields.add(new LayerField(attributes.getValue("name"), Boolean.parseBoolean(attributes.getValue("nillable")), attributes.getValue("type")));
 			}
 			super.startElement(uri, localName, qName, attributes);
 		}

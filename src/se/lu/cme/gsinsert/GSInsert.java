@@ -58,7 +58,7 @@ import javax.swing.text.JTextComponent;
  */
 public class GSInsert {
 	public static final String TITLE = "GeoserverInsert";
-	public static final String VERSION = "v0.3";
+	public static final String VERSION = "v0.4";
 	protected static final String HEADING_USER = "Username:";
 	protected static final String HEADING_PASS = "Password:";
 	protected static final String TOOLTIP_SERVER = "e.g. http://www.my.server/geoserver";
@@ -81,6 +81,8 @@ public class GSInsert {
 	protected static final String RESPONSE_UNAUTHORIZED_MESSAGE = "Auhorization credentials are missing or invalid.\nEnter or correct Your user name and password.\n(Leave blank if they are not required.)";
 	protected static final String URL_WARNING_TITLE = "Invalid URL";
 	protected static final String URL_WARNING_MESSAGE = "Check that your Geoserver URL is correct.";
+	protected static final String EMPTY_WARNING_TITLE = "Required Field Empty";
+	protected static final String EMPTY_WARNING_MESSAGE = "The following field can not be left blank:\n\n";
 	protected static final String CON_ERROR_TITLE = "Connection Failed";
 	protected static final String CON_ERROR_MESSAGE = "There was an error connecting to the server.";
 	protected static final String PARSE_ERROR_TITLE = "Response Error";
@@ -88,7 +90,7 @@ public class GSInsert {
 	protected static final String INSERT_SUCCESS_TITLE = "Upload Success";
 	protected static final String INSERT_SUCCESS_MESSAGE = "The feature was uploaded successfully.";
 	protected static final String INSERT_FAILURE_TITLE = "Upload Failure";
-	protected static final String INSERT_FAILURE_MESSAGE = "The feature was not uploaded correctly. Contact the server administrator.";
+	protected static final String INSERT_FAILURE_MESSAGE = "The feature was not uploaded correctly. Contact the server administrator.\n\nGeoserver reply:\n";
 	public static final Map<String, String> ESCAPESEQUENCES = getEscapeSequences();
 
 	private static Config mConfig;
@@ -123,8 +125,8 @@ public class GSInsert {
 	private String mLayerNamespace;
 	/** A list of references to all the JTextFields belonging to their respective field name. */
 	private HashMap<String, JTextComponent> mTextFields = new HashMap<String, JTextComponent>();
-	/** A list of all the fields' field types, by their name. */
-	private HashMap<String, String> mFieldTypes = new HashMap<String, String>();
+	/** A list of all the fields' information. */
+	private ArrayList<LayerField> mFields;
 
 	/**
 	 * Creates an instance of the class and starts it.
@@ -259,7 +261,7 @@ public class GSInsert {
 						mLayer,
 						mLayerNamespace,
 						attr,
-						mFieldTypes
+						mFields
 						)
 					).start();
 				}
@@ -314,16 +316,15 @@ public class GSInsert {
 	 * @param fields The fields to publish.
 	 */
 	public void publishFields(ArrayList<LayerField> fields) {
+		mFields = fields;
 		/* Clear all LayerField panels, TextField references and Field Types to make room for the new ones. */
 		mFieldsPanel.removeAll(); 
 		mTextFields.clear();
-		mFieldTypes.clear();
 
 		for(LayerField field : fields) {
 			FieldPanel panel = new FieldPanel(field.getName(), field.getType(), field.getNullable(), mConfig.getFields().get(field.getName()));
 			mTextFields.put(field.getName(), panel.getTextArea()); // Store a reference to the JTextField displaying that specific field. 
 			mFieldsPanel.add(panel);
-			mFieldTypes.put(field.getName(), field.getType()); // Store the field types.
 		}
 		mFieldsPanel.add(mSubmitButton);
 		mFrame.pack();
@@ -345,10 +346,15 @@ public class GSInsert {
 	 */
 	private HashMap<String, String> getAttributes() {
 		HashMap<String, String> map = new HashMap<String, String>();
-		// TODO Check if inputs are valid, otherwise alert the user. "if(fail) return null;"
-		for(String field : mTextFields.keySet()) {
-			String text = mTextFields.get(field).getText();
-			if(!mFieldTypes.get(field).split(":", 2)[0].equalsIgnoreCase("gml")) {
+
+		for(LayerField field : mFields) {
+			String text = mTextFields.get(field.getName()).getText(); // Get the user input.
+
+			if(!isInputValid(field, text)) // Checks if inputs are valid and alerts the user if they aren't.
+				return null;
+
+			/* Perform any replacements specified in the configuration file on the user input. */
+			if(!field.getType().split(":", 2)[0].equalsIgnoreCase("gml")) {
 				/* Replace given text with specified replacement text. */
 				ArrayList<String[]> rep = mConfig.getReplace();
 				for(int i=0; i < rep.size(); i++) {
@@ -357,10 +363,36 @@ public class GSInsert {
 						rep.get(i)[0] = rep.get(i)[0].replace(key, ESCAPESEQUENCES.get(key));
 					text = text.replace(rep.get(i)[0], rep.get(i)[1]);
 				}
-				text = "<![CDATA[" + text + "]]>";
-			}			
-			map.put(field, text);
+			}
+
+			map.put(field.getName(), text);
 		}
 		return map;
+	}
+
+	/**
+	 * Checks the given user input String against rules
+	 * determined by the LayerField object, i.e. its
+	 * layer type and nullability. If the input is
+	 * invalid, alerts the user.
+	 * @param field The layer information.
+	 * @param text The user input to check.
+	 * @return True if the user input is valid.
+	 */
+	private boolean isInputValid(LayerField field, String text) {
+		// If the input is empty, check if it is allowed to be.
+		if(text.equalsIgnoreCase(""))
+			if(field.getNullable())
+				return true;
+			else { // Alert the user that the field is not allowed to be empty.
+				displayAlert(EMPTY_WARNING_TITLE, EMPTY_WARNING_MESSAGE + field.getName(), JOptionPane.WARNING_MESSAGE);
+				return false;
+			}
+		else {
+			// TODO Check data type compatibility.
+		}
+		
+		
+		return true;
 	}
 }
